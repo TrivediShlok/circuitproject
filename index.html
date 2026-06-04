@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Three.js — Offline 3D Scene</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+
+    <body>
+        <div class="container">
+            <div id="canvas-container">
+                <div class="canvas-controls">
+                    <button id="btn-orbit" class="control-btn active">
+                        Free Orbit
+                    </button>
+                    <button id="btn-top" class="control-btn">Top View</button>
+                    <button id="btn-bottom" class="control-btn">
+                        Bottom View
+                    </button>
+                </div>
+                <canvas id="three-canvas"></canvas>
+            </div>
+            <div class="elements-container">
+                <div class="elements-area">
+                    <h1>📦 Components</h1>
+                </div>
+                <div class="elements-detail">
+                    <h1>⚙ Inspector</h1>
+                </div>
+            </div>
+        </div>
+
+        <!-- Three.js r128 (local file, no internet needed) -->
+        <script src="three.min.js"></script>
+        <script src="OrbitControls.js"></script>
+
+        <script>
+            const scene = new THREE.Scene();
+            const container = document.querySelector("#canvas-container");
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            const btnTop = document.getElementById("btn-top");
+            const btnBottom = document.getElementById("btn-bottom");
+            const btnOrbit = document.getElementById("btn-orbit");
+            const camera = new THREE.PerspectiveCamera(
+                75,
+                width / height,
+                0.1,
+                1000,
+            );
+            const gridWidth = 4; // 4 mm wide
+            const gridLength = 7; // 7 mm long
+
+            const gridHelper = new THREE.GridHelper(
+                gridLength,
+                gridLength,
+                0xffffff,
+                0xffffff,
+            );
+
+            camera.position.z = 5;
+
+            const renderer = new THREE.WebGLRenderer({
+                canvas: document.querySelector("#three-canvas"),
+                antialias: true,
+                alpha: true,
+            });
+
+            renderer.setSize(container.clientWidth, container.clientHeight);
+
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x00ff00,
+                wireframe: true,
+            });
+
+            window.addEventListener("resize", () => {
+                const newwidth = container.clientWidth;
+                const newheight = container.clientHeight;
+
+                camera.aspect = newwidth / newheight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(newwidth, newheight);
+            });
+
+            const axishelper = new THREE.AxesHelper(5);
+            scene.add(axishelper);
+
+            scene.background = null;
+
+            const cube = new THREE.Mesh(geometry, material);
+
+            // scene.add(cube);
+
+            const boardgeometry = new THREE.BoxGeometry(
+                gridWidth,
+                gridLength,
+                0.1,
+            );
+
+            const ambientlight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientlight);
+
+            const directionallight = new THREE.DirectionalLight(0xffffff, 2.5);
+            directionallight.position.set(5, 10, 7);
+            scene.add(directionallight);
+
+            const fillLight = new THREE.DirectionalLight(0xa6d8ff, 1.0);
+            fillLight.position.set(-5, -5, 5);
+            scene.add(fillLight);
+
+            const textCanvas = document.createElement("canvas");
+            textCanvas.width = 512;
+            textCanvas.height = 512;
+            const ctx = textCanvas.getContext("2d");
+            ctx.font = "Bold 40px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "#FFFFFF";
+
+            const topCanvas = document.createElement("canvas");
+            const bottomCanvas = document.createElement("canvas");
+
+            topCanvas.width = 512;
+            topCanvas.height = 896;
+            bottomCanvas.width = 512;
+            bottomCanvas.height = 896;
+            const ctxTop = topCanvas.getContext("2d");
+            const ctxBottom = bottomCanvas.getContext("2d");
+
+            ctxTop.fillStyle = "#004d1a";
+            ctxTop.fillRect(0, 0, 512, 896);
+            // Small label at top-left edge
+            ctxTop.font = "Bold 16px monospace";
+            ctxTop.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctxTop.textAlign = "left";
+            ctxTop.textBaseline = "top";
+            ctxTop.fillText("TOP", 5, 5);
+
+            ctxBottom.fillStyle = "#004d1a";
+            ctxBottom.fillRect(0, 0, 512, 896);
+            // Small label at bottom-right edge
+            ctxBottom.font = "Bold 16px monospace";
+            ctxBottom.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctxBottom.textAlign = "right";
+            ctxBottom.textBaseline = "bottom";
+            ctxBottom.fillText("BOTTOM", 507, 891);
+
+            const topTexture = new THREE.CanvasTexture(topCanvas);
+            const bottomTexture = new THREE.CanvasTexture(bottomCanvas);
+
+            const sideMaterial = new THREE.MeshStandardMaterial({
+                color: 0x004d1a,
+                roughness: 0.2,
+                metalness: 0.1,
+                side: THREE.DoubleSide,
+            });
+            const topMaterial = new THREE.MeshStandardMaterial({
+                map: topTexture,
+                roughness: 0.2,
+                metalness: 0.1,
+                side: THREE.DoubleSide,
+            });
+
+            const bottomMaterial = new THREE.MeshStandardMaterial({
+                map: bottomTexture,
+                roughness: 0.2,
+                metalness: 0.1,
+                side: THREE.DoubleSide,
+            });
+
+            const pcbMaterials = [
+                sideMaterial, // Right Face (Index 0)
+                sideMaterial, // Left Face  (Index 1)
+                sideMaterial, // Top Face   (Index 2)
+                sideMaterial, // Bottom Face(Index 3)
+                topMaterial, // Front Face (Index 4)
+                bottomMaterial, // Back Face  (Index 5)
+            ];
+
+            const pcbBase = new THREE.Mesh(boardgeometry, pcbMaterials);
+
+            scene.add(pcbBase);
+
+            pcbBase.rotation.x = -Math.PI / 2;
+
+            camera.rotation.z = -Math.PI / 6;
+
+            pcbBase.position.y = -1;
+
+            const controle = new THREE.OrbitControls(
+                camera,
+                renderer.domElement,
+            );
+
+            controle.enableDamping = true;
+            controle.dampingFactor = 0.4;
+
+            btnTop.addEventListener("click", () => {
+                controle.enabled = false;
+                camera.position.set(0, 5, 0);
+                camera.rotation.set(-Math.PI / 2, 0, 0);
+                btnTop.classList.add("active");
+                btnOrbit.classList.remove("active");
+                btnBottom.classList.remove("active");
+                camera.lookAt(0, 0, 0);
+                controle.target.set(0, 0, 0);
+                controle.update();
+            });
+
+            btnOrbit.addEventListener("click", () => {
+                controle.enabled = true; // Re-enable the autopilot mouse dragging
+                camera.up.set(0, 1, 0);
+                btnTop.classList.remove("active");
+                btnOrbit.classList.add("active");
+                btnBottom.classList.remove("active"); // Reset the standard "Up" direction for space
+            });
+
+            btnBottom.addEventListener("click", () => {
+                controle.enabled = false;
+                camera.position.set(0, -7, 0);
+                btnTop.classList.remove("active");
+                btnOrbit.classList.remove("active");
+                btnBottom.classList.add("active");
+                camera.lookAt(0, 0, 0);
+                camera.rotation.z = Math.PI / 6;
+                controle.target.set(0, 0, 0);
+                controle.update();
+            });
+
+            const topGrid = new THREE.GridHelper(
+                gridLength,
+                gridLength,
+                0xffffff,
+                0xffffff,
+            );
+            topGrid.scale.x = gridWidth / gridLength; 
+            topGrid.position.set(0, -0.94, 0); 
+            scene.add(topGrid);
+
+            const bottomGrid = new THREE.GridHelper(
+                gridLength,
+                gridLength,
+                0xffffff,
+                0xffffff,
+            );
+            bottomGrid.scale.x = gridWidth / gridLength; 
+            bottomGrid.position.set(0, -1.06, 0);
+            scene.add(bottomGrid);
+
+            document
+                .querySelector("#three-canvas")
+                .addEventListener("click", () => {
+                    console.log("hello from canvas");
+                });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controle.update();
+
+                // cube.rotation.x += 0.05;
+                cube.rotation.y += 0.02;
+                renderer.render(scene, camera);
+            }
+
+            animate();
+        </script>
+    </body>
+</html>
