@@ -24,6 +24,32 @@
             <div class="elements-container">
                 <div class="elements-area">
                     <h1>📦 Components</h1>
+                    <div class="control-group">
+                        <label for="input-width" class="input-label"
+                            >Width (mm):</label
+                        >
+                        <input
+                            type="number"
+                            id="input-width"
+                            class="dimension-input"
+                            value="4"
+                            min="1"
+                            max="20"
+                            step="1"
+                        />
+                        <label for="input-length" class="input-label"
+                            >Length (mm):</label
+                        >
+                        <input
+                            type="number"
+                            id="input-length"
+                            class="dimension-input"
+                            value="7"
+                            min="1"
+                            max="20"
+                            step="1"
+                        />
+                    </div>
                 </div>
                 <div class="elements-detail">
                     <h1>⚙ Inspector</h1>
@@ -43,6 +69,40 @@
             const btnTop = document.getElementById("btn-top");
             const btnBottom = document.getElementById("btn-bottom");
             const btnOrbit = document.getElementById("btn-orbit");
+            const inputWidth = document.getElementById("input-width");
+            const inputLength = document.getElementById("input-length");
+            function updateBoardSize() {
+                const newWidth = parseFloat(inputWidth.value) || 4;
+                const newLength = parseFloat(inputLength.value) || 7;
+                pcbBase.geometry.dispose();
+                const newBoardGeo = new THREE.BoxGeometry(
+                    newWidth,
+                    newLength,
+                    0.1,
+                );
+                pcbBase.geometry = newBoardGeo;
+                gridGeometry.dispose();
+                const newPoints = [];
+                const halfW = newWidth / 2;
+                const halfL = newLength / 2;
+                for (let x = -halfW; x <= halfW; x += 1) {
+                    newPoints.push(
+                        new THREE.Vector3(x, 0, -halfL),
+                        new THREE.Vector3(x, 0, halfL),
+                    );
+                }
+                for (let z = -halfL; z <= halfL; z += 1) {
+                    newPoints.push(
+                        new THREE.Vector3(-halfW, 0, z),
+                        new THREE.Vector3(halfW, 0, z),
+                    );
+                }
+                gridGeometry.setFromPoints(newPoints);
+                customTopGrid.position.y = pcbCenterY + thickness / 2 + 0.01;
+                customBottomGrid.position.y = pcbCenterY - thickness / 2 - 0.01;
+            }
+            inputWidth.addEventListener("input", updateBoardSize);
+            inputLength.addEventListener("input", updateBoardSize);
             const camera = new THREE.PerspectiveCamera(
                 75,
                 width / height,
@@ -230,25 +290,55 @@
                 controle.update();
             });
 
-            const topGrid = new THREE.GridHelper(
-                gridLength,
-                gridLength,
-                0xffffff,
-                0xffffff,
-            );
-            topGrid.scale.x = gridWidth / gridLength; 
-            topGrid.position.set(0, -0.94, 0); 
-            scene.add(topGrid);
+            const gridGeometry = new THREE.BufferGeometry();
 
-            const bottomGrid = new THREE.GridHelper(
-                gridLength,
-                gridLength,
-                0xffffff,
-                0xffffff,
+            const points = [];
+
+            const halfW = boardgeometry.parameters.width / 2;
+
+            const halfL = boardgeometry.parameters.height / 2;
+
+            const thickness = boardgeometry.parameters.depth;
+
+            const pcbCenterY = pcbBase.position.y;
+
+            for (let x = -halfW; x <= halfW; x += 1) {
+                points.push(new THREE.Vector3(x, 0, -halfL));
+
+                points.push(new THREE.Vector3(x, 0, halfL));
+            }
+
+            for (let z = -halfL; z <= halfL; z += 1) {
+                points.push(new THREE.Vector3(-halfW, 0, z));
+
+                points.push(new THREE.Vector3(halfW, 0, z));
+            }
+
+            gridGeometry.setFromPoints(points);
+
+            const gridMaterial = new THREE.LineBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.35,
+            });
+
+            const customTopGrid = new THREE.LineSegments(
+                gridGeometry,
+                gridMaterial,
             );
-            bottomGrid.scale.x = gridWidth / gridLength; 
-            bottomGrid.position.set(0, -1.06, 0);
-            scene.add(bottomGrid);
+
+            const customBottomGrid = new THREE.LineSegments(
+                gridGeometry,
+                gridMaterial,
+            );
+
+            customTopGrid.position.y = pcbCenterY + thickness / 2 + 0.01;
+
+            customBottomGrid.position.y = pcbCenterY - thickness / 2 - 0.01;
+
+            scene.add(customTopGrid);
+
+            scene.add(customBottomGrid);
 
             document
                 .querySelector("#three-canvas")
