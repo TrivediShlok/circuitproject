@@ -55,7 +55,6 @@
             </div>
         </div>
 
-        <!-- Three.js r128 (local file, no internet needed) -->
         <script src="three.min.js"></script>
         <script src="OrbitControls.js"></script>
 
@@ -69,11 +68,17 @@
             const btnOrbit = document.getElementById("btn-orbit");
             const inputWidth = document.getElementById("input-width");
             const inputLength = document.getElementById("input-length");
-            let newLength;
-            let newWidth;
+            let newWidth = parseFloat(inputWidth.value);
+            let newLength = parseFloat(inputLength.value);
+
             function updateBoardSize() {
                 newWidth = parseFloat(inputWidth.value);
                 newLength = parseFloat(inputLength.value);
+                console.log("hello from updatebordsize", newWidth);
+                initializeGridSystem(
+                    Math.floor(newWidth),
+                    Math.floor(newLength),
+                );
                 pcbBase.geometry.dispose();
                 const newBoardGeo = new THREE.BoxGeometry(
                     newWidth,
@@ -103,7 +108,7 @@
                 const maxDim = Math.max(newWidth, newLength);
                 const fovInRadians = (camera.fov * Math.PI) / 180;
                 let cameraZ = maxDim / (2 * Math.tan(fovInRadians / 2));
-                camera.position.set(0, cameraZ * 1.1, 0);
+                camera.position.set(0, cameraZ * 1.2, 0);
                 controle.target.set(0, 0, 0);
             }
             inputWidth.addEventListener("input", updateBoardSize);
@@ -125,7 +130,7 @@
             const maxDim = Math.max(inputWidth.value, inputLength.value);
             const fovInRadians = (camera.fov * Math.PI) / 180;
             let cameraZ = maxDim / (2 * Math.tan(fovInRadians / 2));
-            camera.position.set(0, cameraZ * 1.1, 0);
+            camera.position.set(0, cameraZ * 1.2, 0);
 
             const renderer = new THREE.WebGLRenderer({
                 canvas: document.querySelector("#three-canvas"),
@@ -254,7 +259,7 @@
                 const maxDim = Math.max(inputWidth.value, inputLength.value);
                 const fovInRadians = (camera.fov * Math.PI) / 180;
                 let cameraZ = maxDim / (2 * Math.tan(fovInRadians / 2));
-                camera.position.set(0, cameraZ * 1.1, 0);
+                camera.position.set(0, cameraZ * 1.2, 0);
                 controle.target.set(0, 0, 0);
                 btnTop.classList.add("active");
                 btnOrbit.classList.remove("active");
@@ -265,11 +270,11 @@
             });
 
             btnOrbit.addEventListener("click", () => {
-                controle.enabled = true; 
+                controle.enabled = true;
                 camera.up.set(0, 1, 0);
                 btnTop.classList.remove("active");
                 btnOrbit.classList.add("active");
-                btnBottom.classList.remove("active"); 
+                btnBottom.classList.remove("active");
             });
 
             btnBottom.addEventListener("click", () => {
@@ -277,7 +282,7 @@
                 const maxDim = Math.max(inputWidth.value, inputLength.value);
                 const fovInRadians = (camera.fov * Math.PI) / 180;
                 let cameraZ = maxDim / (2 * Math.tan(fovInRadians / 2));
-                camera.position.set(0, cameraZ * 1.1, 0);
+                camera.position.set(0, -cameraZ * 1.5, 0);
                 btnTop.classList.remove("active");
                 btnOrbit.classList.remove("active");
                 btnBottom.classList.add("active");
@@ -337,11 +342,125 @@
 
             scene.add(customBottomGrid);
 
+            let pcbGrid = [];
+
+            function initializeGridSystem(width, length) {
+                pcbGrid = [];
+                for (let x = 0; x < width; x++) {
+                    pcbGrid[x] = [];
+                    for (let z = 0; z < length; z++) {
+                        pcbGrid[x][z] = 0;
+                    }
+                }
+            }
+            initializeGridSystem(inputWidth.value, inputLength.value);
+
+            function canPlaceComponent(startX, startZ, compWidth, compLength) {
+                for (let x = startX; x < startX + compWidth; x++) {
+                    for (let z = startZ; z < startZ + compLength; z++) {
+                        if (
+                            x < 0 ||
+                            x >= pcbGrid.length ||
+                            z < 0 ||
+                            z >= pcbGrid[0].length
+                        ) {
+                            return false;
+                        } else if (pcbGrid[x][z] !== 0) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            function placeComponent(startX, startZ, compWidth, compLength) {
+                if (canPlaceComponent(startX, startZ, compWidth, compLength)) {
+                    for (let x = startX; x < startX + compWidth; x++) {
+                        for (let z = startZ; z < startZ + compLength; z++) {
+                            pcbGrid[x][z] = 1;
+                        }
+                    }
+                    console.log(
+                        "Component successfully locked into grid database!",
+                    );
+                    return true;
+                }
+                console.error(
+                    "Placement rejected: Collision or Out of Bounds!",
+                );
+                return false;
+            }
+
+            function gridToWorld(gridX, gridZ, compWidth, compLength) {
+                const worldX = gridX + compWidth / 2 - newWidth / 2;
+                const worldZ = gridZ + compLength / 2 - newLength / 2;
+                return new THREE.Vector3(
+                    worldX,
+                    pcbBase.position.y + 0.05,
+                    worldZ,
+                );
+            }
+
+            function spawnComponent(
+                gridX,
+                gridZ,
+                compWidth,
+                compLength,
+                colorHex,
+            ) {
+                if (!placeComponent(gridX, gridZ, compWidth, compLength)) {
+                    return;
+                }
+                const compGeo = new THREE.BoxGeometry(
+                    compWidth,
+                    0.4,
+                    compLength,
+                );
+                const compMat = new THREE.MeshStandardMaterial({
+                    color: colorHex,
+                    roughness: 0.5,
+                });
+                const compMesh = new THREE.Mesh(compGeo, compMat);
+                const worldPos = gridToWorld(
+                    gridX,
+                    gridZ,
+                    compWidth,
+                    compLength,
+                );
+                compMesh.position.copy(worldPos);
+                scene.add(compMesh);
+            }
+
             document
                 .querySelector("#three-canvas")
-                .addEventListener("click", () => {
-                    console.log("hello from canvas");
+                .addEventListener("click", (event) => {
+                    const rect = renderer.domElement.getBoundingClientRect();
+                    const mouseX =
+                        ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                    const mouseY =
+                        -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.setFromCamera(
+                        new THREE.Vector2(mouseX, mouseY),
+                        camera,
+                    );
+                    const intersects = raycaster.intersectObject(pcbBase);
+
+                    if (intersects.length > 0) {
+                        const hitPoint = intersects[0].point;
+                        const currentWidth = parseFloat(inputWidth.value);
+                        const currentLength = parseFloat(inputLength.value);
+                        const localX = hitPoint.x + currentWidth / 2;
+                        const localZ = hitPoint.z + currentLength / 2;
+                        const gridX = Math.floor(localX);
+                        const gridZ = Math.floor(localZ);
+                        console.log(`Clicked Grid Cell: (${gridX}, ${gridZ})`);
+                        spawnComponent(gridX, gridZ, 1, 2, 0xff0000);
+                    }
                 });
+
+                console.log(pcbGrid);
 
             function animate() {
                 requestAnimationFrame(animate);
